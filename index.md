@@ -2,8 +2,229 @@ Table of Contents
 =================
 
 * [1. Introduction](#1-introduction)
+* [2. Columnar Analysis](#2-columnar)
+  * [2.1 Columnar vs. Per-Event Analysis](#21-columnar-vs-per-event-analysis)
+  * [2.2 Complex selections in columnar-style](#22-complex-selections-in-columnar-style)
+  * [2.3 Notes on awkward, uproot, and vector](#23-notes-on-awkward-uproot-and-vector)
   
 ----
 
 # 1. Introduction
 Welcome to the documentation record of the Higgs to tau tau version of the HiggsDNA framework. HiggsDNA provides tools for developing and executing Higgs to ditau analyses, starting from the nanoAOD data tier.
+
+# 2 Columnar Analysis
+HiggsDNA is based on a "columnar" style of analysis, where event selections are performed in a vectorized fashion (i.e. `numpy`-style operations).
+One of the core dependencies of HiggsDNA is `awkward`, which is very similar to `numpy` in terms of user interface, but has the advantage of providing superior performance on "jagged" arrays.
+A jagged array has one or more dimensions which are variable in length. In a HEP-context, this shows up quite frequently: for example, the number of hadronic jets in a given event may be 2, 11, or even 0.
+`numpy` is not optimized to handle jagged arrays, while `awkward` is.
+
+## 2.1 Columnar vs. Per-Event Analysis
+Before diving into tools further, lets compare "columnar" analysis with "per-event" analysis, which is more traditionally used in HEP.
+In "per-event" analysis, one explicitly performs loops through the events and objects in each event.
+For example, consider a dummy analysis where we select for events with 3 or more jets, making some basic requirements on each jet.
+In the "per-event" style:
+```python
+selected_events = []
+for evt in events:
+    n_jets = 0
+    for jet in evt.Jet:
+        if jet.pt < 25:
+            continue
+        if abs(jet.eta) < 2.4:
+            continue
+        n_jets += 1
+    if n_jets >= 3:
+        selected_events.append(evt)
+```
+vs. in the "columnar" style with `awkward`:
+```
+import awkward
+jet_cut = (events.Jet.pt > 25.) & (abs(events.Jet.eta) < 2.4) 
+selected_jets = events.Jet[jet_cut]
+
+cut = awkward.num(selected_jets) >= 3
+selected_events = events[cut]
+```
+
+Why should we prefer the columnar-style to the per-event-style?
+The reason is that loops like the one shown above are extremely slow in `python`, due to the fact that `python` is not a compiled language and performs type-checking at each point in the loop.
+While the columnar code above is not explicitly compiled, its operations are, and this gives us a substantial performance boost.
+We will also see that the per-event style can still be used without the performance loss by using the module `numba`, which can perform compilation of `python` functions.
+
+## 2.2 Complex selections in columnar-style
+For something like counting the number of jets, it is simple enough to see how to translate per-event-style code into columnar-style code.
+However, what if we are doing something more complicated, like creating Z candidates out of opposite-sign same-flavor (OSSF) lepton pairs?
+Supposing we have already created arrays of our selected electrons and selected muons, we could construct OSSF lepton pairs as follows.
+First, we will import the scikit-hep `vector` package, which allows us to perform four-vector operations and works nicely with `awkward`.
+```python
+import awkward
+import vector
+vector.register_awkward()
+```
+the `register_awkward()` line registers `awkward.Array` behaviors globally with `vector` so that when can identify certain `awkward` arrays as four vectors and have the operations overloaded as we expect (along with other functions and properties, like `.mass` or `.deltaR()`).
+Back to our example:
+```python
+electrons = awkward.Array(electrons, with_name = "Momentum4D") # now we can do things like electrons.deltaR(photons)
+ele_pairs = awkward.combinations(
+    electrons, # objects of make combinations out of
+    2, # how many objects in each combination
+    fields = ["LeadLepton", "SubleadLepton"] # can access these as e.g. ee_pairs.LeadLepton.pt
+)
+```
+we have now created all possible pairs of 2 electrons in each event. We could do the same for muons and then concatenate these arrays together:
+```python
+muon_pairs = awkward.combinations(muons, 2, fields = ["LeadLepton", "SubleadLepton"])
+dilep_pairs = awkward.concatenate(
+    [ele_pairs, muon_pairs], # arrays to concatenate
+    axis = 1 # this keeps the number of events constant, and increases the number of pairs per event. axis = 0 would increase the number of events
+)
+dilep_pairs["ZCand"] = dilep_pairs.LeadLepton + dilep_pairs.SubleadLepton # these add as 4-vectors since we registered them as "Momentum4D" objects
+```
+Now we can place some cuts on the z candidates. Lets enforce that they are opposite-sign (same-flavor has already been enforced through construction) and have an invariant mass in the [86, 96] GeV range:
+```
+os_cut = dilep_pairs.LeadLepton.charge * dilep_pairs.SubleadLepton.charge == -1
+mass_cut = (dilep_pairs.ZCand.mass > 86.) & (dilep_pairs.ZCand.mass < 96.)
+cut = os_cut & mass_cut
+dilep_pairs = dilep_pairs[cut]
+```
+At this point, we might want to flatten the Z candidates and perform any further analysis on a per-z-candidate basis (rather than per-event basis):
+```
+dilep_pairs = awkward.flatten(dilep_pairs) # no longer a jagged array
+```
+or we might want to simply select events that have at least 1 z-candidate:
+```
+z_candidate_cut = awkward.num(dilep_pairs) >= 1
+events = events[z_candidate_cut]
+```
+
+If you prefer per-event analysis to columnar analysis, this is also possible in HiggsDNA!
+Lets compare an even more complex example and see how this would be done in columnar-style and then in per-event style.
+Suppose we want to select jets that are at least deltaR of 0.2 away from all selected leptons in an event.
+In columnar style,
+```python
+def delta_R(objects1, objects2, min_dr):
+    """
+    Select objects from objects1 which are at least min_dr away from all objects in objects2.
+    """
+    # Step 1: make sure each of these arrays have at least 1 object for each
+    if awkward.count(objects1) == 0 or awkward.count(objects2) == 0: # make sure each of these arrays have at least 1 object for each
+        return objects1.pt < 0.
+
+    # Step 2: make sure each array is cast as a four vector
+    if not isinstance(objects1, vector.Vector4D):
+        objects1 = awkward.Array(objects1, with_name = "Momentum4D")
+    if not isinstance(objects2, vector.Vector4D):
+        objects2 = awkward.Array(objects2, with_name = "Momentum4D")
+
+    # Step 3: manipulate shapes so they can be cast together
+    obj1 = awkward.unflatten(objects1, counts = 1, axis = -1) # shape [n_events, n_obj1, 1]
+    obj2 = awkward.unflatten(objects2, counts = 1, axis = 0) # shape [n_events, 1, n_obj2]
+
+    dR = obj1.deltaR(obj2) # shape [n_events, n_obj1, n_obj2]
+
+    # Step 4: select objects from objects1 which are at least deltaR of min_dr away from all objects in objects2
+    selection = awkward.all(dR >= min_dr, axis = -1) # shape [n_events, n_obj1]
+    return selection
+```
+and in per-event style, we can use the package `numba` to compile our python loops.
+```python
+def delta_R_numba(objects1, objects2, min_dr):
+    """
+    This performs the exact same thing as the function before, but this calls an additional function, `compute_delta_R` which is compiled with `numba`.
+    """
+    n_objects1 = awkward.num(objects1)
+    n_objects2 = awkward.num(objects2)
+
+    offsets, contents = compute_delta_R(
+            objects1, n_objects1,
+            objects2, n_objects2,
+            min_dr
+    )
+
+    selection = awkward_utils.construct_jagged_array(offsets, contents)
+
+    return selection
+
+@numba.njit # decorate function with a numba decorator so it gets compiled before it is called
+def compute_delta_R(objects1, n_objects1, objects2, n_objects2, min_dr):
+    n_events = len(objects1)
+
+    offsets = numpy.zeros(n_events + 1, numpy.int64) # need to tell numba what type these are 
+    contents = []
+
+    for i in range(n_events):
+        offsets[i+1] = offsets[i] + n_objects1[i]
+        for j in range(n_objects1[i]):
+            contents.append(True)
+            offset_idx = offsets[i] + j
+            for k in range(n_objects2[i]):
+                if not contents[offset_idx]:
+                    continue
+                obj1 = vector.obj( # vector works nicely with numba!
+                        pt = objects1[i][j].pt,
+                        eta = objects1[i][j].eta,
+                        phi = objects1[i][j].phi,
+                        mass = objects1[i][j].mass
+                )
+                obj2 = vector.obj(
+                        pt = objects2[i][k].pt,
+                        eta = objects2[i][k].eta,
+                        phi = objects2[i][k].phi,
+                        mass = objects2[i][k].mass
+                )
+                dR = obj1.deltaR(obj2)
+                if dR < min_dr:
+                    contents[offset_idx] = False
+
+    return offsets, numpy.array(contents)
+```
+
+## 2.3 Notes on `awkward`, `uproot`, and `vector`
+When loading events from a flat `root` file, `uproot` and `awkward` work together nicely to load the events in an inuitive way:
+```python
+import uproot
+import awkward
+
+f_nano = "root://redirector.t2.ucsd.edu//store/user/hmei/nanoaod_runII/HHggtautau/ttHJetToGG_M125_13TeV_amcatnloFXFX_madspin_pythia8_RunIIFall17MiniAODv2-PU2017_12Apr2018_94X_mc2017_realistic_v14-v1_MINIAODSIM_v0.6_20201021/test_nanoaod_1.root"
+
+with uproot.open(f_nano) as f:
+    tree = f["Events"] # can access TTrees by name
+    events = tree.arrays(library = "ak", how = "zip")
+```
+Here, by specifying `library = "ak", how = "zip"`, we are now able to access branches as records, with any jagged-length branches zipped together.
+It is easiest to illusrate this through some examples:
+```
+events["MET_pt"] # access met pt
+events.MET_pt # also works to access met pt
+
+events.Jet # jagged array with all jet sub-fields accessible as records
+events.Jet.pt # access jet pt
+events.Jet.eta # or jet eta
+events[("Jet", "pt")] # can also access them through a tupled name
+```
+
+In our `events = tree.arrays(...` line we could also specify to only read certain branches from the TTree, which can drastically improve the I/O time:
+```
+with uproot.open(f_nano) as f:
+    tree = f["Events"] # can access TTrees by name
+    events = tree.arrays(["MET_pt", "Jet_pt", "Jet_eta"], library = "ak", how = "zip")
+```
+
+When adding or modifying fields of an `awkward.Array`, it is important to call them by the string for their name.
+For example, if we wanted to place a jet cut and update the jet collection:
+```
+jet_cut = events.Jet.pt > 25.
+events["Jet"] = events.Jet[jet_cut] # works
+events["Jet"] = events["Jet"][jet_cut] # also works
+events.Jet = events.Jet[jet_cut] # does NOT work
+
+# also true for creating new fields
+events["SelectedJet"] = events.Jet[jet_cut] # works
+events.SelectedJet = events.Jet[jet_cut] # does NOT work
+
+# and for nested fields
+events[("Jet", "pt")] = awkward.ones_like(events.Jet.pt) # works
+events.Jet.pt = awkward.ones_like(events.Jet.pt) # does NOT work
+events["Jet"].pt = awkward.ones_like(events.Jet.pt) # does NOT work
+```
+all of the examples above will run without error, but some of them do not do what you intend.
