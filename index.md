@@ -1,8 +1,13 @@
 Table of Contents
 =================
 
-* [Higgs DNA - Higgs to Tau Tau - Documentation]
-
+* [Documentation for Higgs to tau tau version of the HiggsDNA framework] (#welcome)
+* [1. Introduction] (#1-introduction)
+  
 ----
 
-# Higgs DNA START
+# Documentation for Higgs to tau tau version of the HiggsDNA framework
+Welcome to the documentation record of the Higgs to tau tau version of the HiggsDNA framework.
+
+# 1. Introduction
+HiggsDNA provides tools for developing and executing Higgs to ditau analyses, starting from the nanoAOD data tier.
