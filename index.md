@@ -6,6 +6,9 @@ Table of Contents
   * [2.1 Columnar vs. Per-Event Analysis](#21-columnar-vs-per-event-analysis)
   * [2.2 Complex selections in columnar-style](#22-complex-selections-in-columnar-style)
   * [2.3 Notes on awkward, uproot, and vector](#23-notes-on-awkward-uproot-and-vector)
+* [3. Setup](#3-setup)
+  * [3.1 Environment](#31-environment)
+  * [3.2 Installation](#32-intallation) 
   
 ----
 
@@ -228,3 +231,31 @@ events.Jet.pt = awkward.ones_like(events.Jet.pt) # does NOT work
 events["Jet"].pt = awkward.ones_like(events.Jet.pt) # does NOT work
 ```
 all of the examples above will run without error, but some of them do not do what you intend.
+
+# 3. Setup
+This section contains details on how to set up the base environment for HiggsDNA as well as, instructions on how to install HiggsDNA.
+
+## 3.1 Environment
+Installing [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html):
+```
+curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+# Linux/bash:
+./bin/micromamba shell init -s bash -p ~/micromamba  # this writes to your .bashrc file
+# sourcing the bashrc file incorporates the changes into the running session.
+# better yet, restart your terminal!
+source ~/.bashrc
+```
+## 3.2 Installation
+```
+git clone https://gitlab.cern.ch/dwinterb/HiggsDNA.git
+cd HiggsDNA
+micromamba env create -f environment.yml
+micromamba activate higgs-dna
+pip install -e .[dev]
+
+# Repository is cloned via https, you can set up a remote via ssh
+git remote add origin_SSH ssh://git@gitlab.cern.ch:7999/dwinterb/HiggsDNA.git
+
+# Adding the main HiggsDNA (diphoton) as a remote
+git remote add CMS https://gitlab.cern.ch/HiggsDNA-project/HiggsDNA.git
+```
