@@ -13,7 +13,7 @@ Table of Contents
   * [4.1 Command Line Tool](#41-command-line-tool)
   * [4.2 Processor](#42-processor)
     * [4.2.1 Coffea Processor](#421-coffea-processor)
-    * [4.2.2 HtautauBaseProcessor](#422-htautauBaseProcessor)
+    * [4.2.2 HtautauBaseProcessor](#422-HtautauBaseProcessor)
   
 ----
 
@@ -324,4 +324,4 @@ Columnar analysis is a paradigm that describes the way the user writes the analy
 ### 4.2.1 Coffea Processor
 In almost all HEP analyses, each row corresponds to an independent event, and it is exceptionally rare to need to compute inter-row derived quantities. Due to this, horizontal scale-out is almost trivial: each chunk of rows can be operated on independently. Further, if the output of an analysis is restricted to reducible accumulators such as histograms (abstracted by dask, dask-awkward, and dask-histogram), then outputs can even be merged via tree reduction. The ProcessorABC class is an abstraction to encapsulate analysis code so that it can be easily scaled out, leaving the delivery of input columns and reduction of output accumulators to the coffea framework. However, it is not an absolute requirement and merely a useful organizational framework.
 
-### 4.2.1 HtautauBaseProcessor
+### 4.2.2 HtautauBaseProcessor
