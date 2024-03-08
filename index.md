@@ -325,3 +325,14 @@ Columnar analysis is a paradigm that describes the way the user writes the analy
 In almost all HEP analyses, each row corresponds to an independent event, and it is exceptionally rare to need to compute inter-row derived quantities. Due to this, horizontal scale-out is almost trivial: each chunk of rows can be operated on independently. Further, if the output of an analysis is restricted to reducible accumulators such as histograms (abstracted by dask, dask-awkward, and dask-histogram), then outputs can even be merged via tree reduction. The ProcessorABC class is an abstraction to encapsulate analysis code so that it can be easily scaled out, leaving the delivery of input columns and reduction of output accumulators to the coffea framework. However, it is not an absolute requirement and merely a useful organizational framework.
 
 ### 4.2.2 HtautauBaseProcessor
+Since in the Higgs to ditau analysis some operations are common to several other analyses, a base processor HtautauBaseProcessor was created which can be used in several other basic analyses. Currently, when running the command-line tool the constructor of this class is fed the following:
+
+- `metaconditions`: Name (without .json extension) of one of the JSON files. This holds selections such as ID choices, MET type, number of leptons/particles for each channel, Met filters, trigger selections, etc. This file is located in `higgs_dna.metaconditions`
+- `systematics`: List of systematics
+- `corrections`: List of corrections
+- `apply_trigger`: Boolean to apply triggers (Not used)
+- `output_location`: Location to store the output .parquet files
+- `taggers`: List of taggers
+- `trigger_group`: Not used at the moment but included as an option
+- `analysis`: Name of the analysis
+- `year`
