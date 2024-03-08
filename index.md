@@ -8,7 +8,9 @@ Table of Contents
   * [2.3 Notes on awkward, uproot, and vector](#23-notes-on-awkward-uproot-and-vector)
 * [3. Setup](#3-setup)
   * [3.1 Environment](#31-environment)
-  * [3.2 Installation](#32-intallation) 
+  * [3.2 Installation](#32-intallation)
+* [4. Main Concepts](#4-mainconcepts)
+  * [4.1 Command Line Tool](#41-cmdlinetool)
   
 ----
 
@@ -259,3 +261,57 @@ git remote add origin_SSH ssh://git@gitlab.cern.ch:7999/dwinterb/HiggsDNA.git
 # Adding the main HiggsDNA (diphoton) as a remote
 git remote add CMS https://gitlab.cern.ch/HiggsDNA-project/HiggsDNA.git
 ```
+# 4. Main Concepts
+This section describes some of the main concepts of HiggsDNA.
+## 4.1 Command Line Tool
+If you want to run an analysis with processors and taggers that have already been developed, the suggested way is to use the command line tool `run_analysis.py`. The main parts that define an analysis are the following:
+
+- `datasets`: Path to a JSON file in the form {"dataset_name": [list_of_files]} (like the one dumped by dasgoclient)
+- `workflow`: The coffea processor you want to use to process your data, can be found in the modules located inside the subpackage `higgs_dna.workflows`
+- `metaconditions`: Name (without .json extension) of one of the JSON files. This holds selections such as ID choices, MET type, number of leptons/particles for each channel, Met filters, trigger selections, etc. This file is located in `higgs_dna.metaconditions`
+- `year`: the year condition
+- `taggers`: Set of taggers you want to use, can be found in the modules located inside the subpackage `higgs_dna/workflows/taggers`
+- systematics: Set of systematics to be used
+- corrections: Set of corrections to be used
+
+These parameters are specified in a JSON file and passed to the command line with the flag `--json-analysis`
+
+```run_analysis.py --json-analysis simple_analysis.json```
+
+where `simple_analysis.json` looks like this:
+```
+{
+    "samplejson": "examples/ditau_analysis/dyzll.json",
+    "workflow": "ditau",
+    "year": "2022_postEE",
+    "metaconditions": "Era2022_postEE_Htautau_v1",
+    "taggers": [
+    ],
+    "systematics": {
+    },
+    "corrections": {
+        ["Pileup","Tau_ID","Tau_ES","Electron_ID","Electron_Reco","Muon_ID","Muon_Isolation","Muon_Reco"]
+    }
+}
+```
+where the `taggers` list, `systematics`, and `corrections` dictionaries can be left empty if no taggers or systematics are applied.
+
+The next two flags to be specified are `dump` and `executor`. The former receives the path to a directory where the parquet output files will be stored, while the latter specifies the Coffea executor used to process the chunks of data. The options are the following:
+
+- iterative
+- futures
+- dask/condor
+- dask/slurm
+- dask/lpc
+- dask/lxplus
+- dask/casa
+- parsl/slurm
+- parsl/condor
+- imperial_lx
+
+
+A few notable options are available with the command line tool are `--chunk`, `---debug`, and `--environment`. The latter is to be used with the `--executor imperial_lx` option such that the job sent to the cluster sources the appropriate environment.
+
+As usual, a description of all the options is printed when running:
+```run_analysis.py --help```
+
