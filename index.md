@@ -8,9 +8,12 @@ Table of Contents
   * [2.3 Notes on awkward, uproot, and vector](#23-notes-on-awkward-uproot-and-vector)
 * [3. Setup](#3-setup)
   * [3.1 Environment](#31-environment)
-  * [3.2 Installation](#32-intallation)
-* [4. Main Concepts](#4-mainconcepts)
-  * [4.1 Command Line Tool](#41-cmdlinetool)
+  * [3.2 Installation](#32-installation)
+* [4. Main Concepts](#4-main-concepts)
+  * [4.1 Command Line Tool](#41-command-line-tool)
+  * [4.2 Processor](#42-processor)
+    * [4.2.1 Coffea Processor](#421-coffea-processor)
+    * [4.2.2 HtautauBaseProcessor](#422-htautauBaseProcessor)
   
 ----
 
@@ -315,3 +318,10 @@ A few notable options are available with the command line tool are `--chunk`, `-
 As usual, a description of all the options is printed when running:
 ```run_analysis.py --help```
 
+## 4.2 Processor
+Columnar analysis is a paradigm that describes the way the user writes the analysis application that is best described in contrast to the traditional paradigm in high-energy particle physics (HEP) of using an event loop. In an event loop, the analysis operates row-wise on the input data (in HEP, one row usually corresponds to one reconstructed particle collision event.) Each row is a structure containing several fields, such as the properties of the visible outgoing particles that were reconstructed in a collision event. The analysis code manipulates this structure to either output derived quantities or summary statistics in the form of histograms. In contrast, columnar analysis operates on individual columns of data spanning a chunk (partition, batch) of rows using array programming primitives in turn, to compute derived quantities and summary statistics. Array programming is widely used within the scientific Python ecosystem, supported by the numpy library. However, although the existing scientific Python stack is fully capable of analyzing rectangular arrays (i.e. no variable-length array dimensions), HEP data is very irregular, and manipulating it can become awkward without first generalizing array structure a bit. The awkward package does this, extending array programming capabilities to the complexity of HEP data.
+
+### 4.2.1 Coffea Processor
+In almost all HEP analyses, each row corresponds to an independent event, and it is exceptionally rare to need to compute inter-row derived quantities. Due to this, horizontal scale-out is almost trivial: each chunk of rows can be operated on independently. Further, if the output of an analysis is restricted to reducible accumulators such as histograms (abstracted by dask, dask-awkward, and dask-histogram), then outputs can even be merged via tree reduction. The ProcessorABC class is an abstraction to encapsulate analysis code so that it can be easily scaled out, leaving the delivery of input columns and reduction of output accumulators to the coffea framework. However, it is not an absolute requirement and merely a useful organizational framework.
+
+### 4.2.1 HtautauBaseProcessor
