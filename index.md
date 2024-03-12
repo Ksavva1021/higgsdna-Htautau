@@ -14,7 +14,7 @@ Table of Contents
   * [4.2 Processor](#42-processor)
     * [4.2.1 Coffea Processor](#421-coffea-processor)
     * [4.2.2 HtautauBaseProcessor](#422-HtautauBaseProcessor)
-* [5. Workflow - Analysis Chain](#5-workflow-analysis-chain)
+* [5. Workflow - Analysis Chain](#5-workflow--analysis-chain)
   
 ----
 
