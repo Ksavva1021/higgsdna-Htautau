@@ -341,7 +341,41 @@ Since in the Higgs to ditau analysis some operations are common to several other
 # 5. Workflow - Analysis Chain
 This section will go over the workflow as seen in the base class under the process function. The plan is to update this as more functionality is added. 
 
-- Applying MET filters
-- Applying Muon Pre-selection
-- Applying Electron Pre-selection
-- Applying Tau Pre-selection
+The process function is the heart of our analysis code. To begin with, there is a check on whether the dataset is `MC or Data` and the number of effective events is calculated accordingly. If the dataset is MC then, the effective event number is calculated as follows:
+
+`n_effective = n_{o} +ve generator weights - n_{o} of -ve generator weights`
+
+where these quantities are drawn from the genWeight variable stored in NanoAOD for each event.
+
+The metaconditions file is used to define the channels to process but, the channels are set to all channels by default if the metaconditions file does not include a selection. At this point the list of systematics and corrections to process are assigned to a variable. At this point in time, the systematics and corrections are assumed to be event weight based but, this will be updated once corrections and systematics affecting object-level quantities such as $p_{T}$ are implemented.
+
+MET filters are applied to the events via the `apply_met_filters` function which applies MET filters to the events based on a list of filters specified in the metaconditions. The MET filters are applied using the logical AND operation on the individual filter flags. 
+
+The next step is to store the nominal object collections in a dictionary `objs_dct["nominal"] = (original_electrons, original_muons, original_taus)`. These collections are drawn from the corresponding collections in NanoAOD. The same applies for jets and MET. At this point, the need of storing these collections in a dictionary with key set to "nominal" might seem a bit vague but, when systematics affecting the object-level quantities such as $p_{T}$ are implemented, this will be important. This is important because such corrections/systematics do not affect the event as a global weight but, affect which events pass the selections. Unfortunately, there is not a clean way around this and the processing for each one of these systematic variations needs to be run in a loop thus, the need for these keys in the objs_dct. 
+
+Diving into the processing that takes place for each of these variations:
+
+- Muon, Tau, Electron preselections
+- For each event, muons, taus, electrons are sorted respectively in $p_{T}$ in descending order
+- For each event, muons and electrons are sorted by isolation (ascending)
+- For each event, taus are sorted based on the RAW ID score for the vsJet ID, descending (high score --> more isolated)
+- Pairs are created for each channel
+  - Same-type pairs (mm, ee, tt): Combinations of the objects are made and then the pairs are sorted such that the first object in the pair has the highest $p_{T}$.
+  - For mixed channels (em, et, mt): For combinations of mixed pairs we follow the usual HTT conventions and lighter leptons are preferred for obj_1. Note when using the cartesian function the pairs will be ordered preferentially by the objects passed as the first argument. We want to order the pairs prefering muons > electrons > taus.
+- Looping over Channels and pairs in each channel:
+  -  Applying a $\Delta$R cut > 0.5 between the two objects in the pair
+  -  Applying $p_{T}$ and $\eta$ cuts to the objects based on selections in specified in metaconditions
+  -  Applying extra lepton vetoes to ensure orthogonality
+  -  Only hold the first pair passing the selections (highest ranked one)
+  -  Drop None
+  -  if the sample is MC, add relevant gen information `add_pair_gen_info`
+  -  Adding `pair-level quantities`
+  -  Now we pick up the MET and jets, and we apply the same mask that we used to select only our good pairs
+  -  First we filter the jets that are matched in dR to our selected tau candidates
+  -  compute and add our jet quantities `add_jet_quantities`
+  -  For other jets we filter the bjets that are matched in dR to our selected tau candidates
+  -  Add MET quantities e.g MET, transverse masses etc `add_met_quantities`
+  -  Apply trigger matching which adds booleons to the array indicating whether the pair legs were matched to particular trigger objects
+  -  if sample is MC, event-based weights are added (systematics will be added here as well)
+  -  Outputs are dumped into a `.parquet` file
+
