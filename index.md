@@ -14,6 +14,7 @@ Table of Contents
   * [4.2 Processor](#42-processor)
     * [4.2.1 Coffea Processor](#421-coffea-processor)
     * [4.2.2 HtautauBaseProcessor](#422-HtautauBaseProcessor)
+* [5. Workflow - Analysis Chain](#5-workflow-analysis-chain)
   
 ----
 
@@ -336,3 +337,11 @@ Since in the Higgs to ditau analysis some operations are common to several other
 - `trigger_group`: Not used at the moment but included as an option
 - `analysis`: Name of the analysis
 - `year`
+
+# 5. Workflow - Analysis Chain
+This section will go over the workflow as seen in the base class under the process function. The plan is to update this as more functionality is added. 
+
+- Applying MET filters
+- Applying Muon Pre-selection
+- Applying Electron Pre-selection
+- Applying Tau Pre-selection
