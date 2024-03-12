@@ -363,7 +363,7 @@ Diving into the processing that takes place for each of these variations:
   - Same-type pairs (mm, ee, tt): Combinations of the objects are made and then the pairs are sorted such that the first object in the pair has the highest $p_{T}$.
   - For mixed channels (em, et, mt): For combinations of mixed pairs we follow the usual HTT conventions and lighter leptons are preferred for obj_1. Note when using the cartesian function the pairs will be ordered preferentially by the objects passed as the first argument. We want to order the pairs prefering muons > electrons > taus.
 - Looping over Channels and pairs in each channel:
-  -  Applying a $\Delta$R cut > 0.5 between the two objects in the pair
+  -  Applying a dR cut > 0.5 between the two objects in the pair
   -  Applying $p_{T}$ and $\eta$ cuts to the objects based on selections in specified in metaconditions
   -  Applying extra lepton vetoes to ensure orthogonality
   -  Only hold the first pair passing the selections (highest ranked one)
