@@ -15,6 +15,7 @@ Table of Contents
     * [4.2.1 Coffea Processor](#421-coffea-processor)
     * [4.2.2 HtautauBaseProcessor](#422-HtautauBaseProcessor)
 * [5. Workflow - Analysis Chain](#5-workflow---analysis-chain)
+* [6. Batch Jobs](#6-batch-jobs)
   
 ----
 
@@ -379,3 +380,7 @@ Diving into the processing that takes place for each of these variations:
   -  if sample is MC, event-based weights are added (systematics will be added here as well)
   -  Outputs are dumped into a `.parquet` file
 
+# 6. Batch Jobs
+To enable submission of jobs to the IC batch system, `--executor imperial_lx` needs to be added to the command-line tool described in [4.1 Command Line Tool](#41-command-line-tool). It is also recommended to specify the environment that you have installed on your setup e.g. micromamba or conda with this option `--environment conda`. The batch submission works by creating a directory in your main higgsDNA directory called `.higgs_dna_ic_batch` where new inputs for each file in the provided sample filelist are created and stored in the `inputs` subdirectory. An additional subdirectory `jobs` is created which stores the output, error, and bash files. The outputs are stored as per usual in the normal output folder which can be specified using the `--dump` option. 
+
+To check and resubmit jobs,one can execute the following command `./scripts/resubmit_jobs.sh --directory --jobduration` where the `directory` is replaced with the directory holding the job logs in `.higgs_dna_ic_batch/.../jobs/` and `jobduration` is replaced by a number in minutes i.e. 180 for the short queue.
